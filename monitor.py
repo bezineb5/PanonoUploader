@@ -1,14 +1,29 @@
+import argparse
+import datetime
+import pathlib
+import shutil
 import tempfile
 import time
-import pathlib
-import datetime
-import shutil
+
+import requests
 
 import pyudev
 import sh
 
+from .upf_upload import login, upload_upf
+
+args = None
+
+
+def _upload(files):
+    with requests.Session() as session:
+        login(session, args.email, args.password)
+        for filename in files:
+            upload_upf(session, filename)
+
 
 def _copy_file(f: pathlib.Path, output_path: pathlib.Path):
+    print("Processing: ", str(f))
     statResult = f.stat()
     file_timestamp = datetime.datetime.fromtimestamp(statResult.st_mtime)
 
@@ -21,7 +36,7 @@ def _copy_file(f: pathlib.Path, output_path: pathlib.Path):
 
     if destination.exists():
         print("File already exists: ", destination)
-        return
+        return None
 
     # Create directories if needed
     destination_dir.mkdir(parents=True, exist_ok=True)
@@ -29,13 +44,20 @@ def _copy_file(f: pathlib.Path, output_path: pathlib.Path):
     # Copy the file
     shutil.copy2(str(f), str(destination))
 
+    return destination
+
 
 def _synchronize(input_path: str, output_path: str):
+    files_to_upload = []
+
     output_dir = pathlib.Path(output_path)
     rootdir = pathlib.Path(input_path)
+    
     for f in rootdir.rglob('*'):
         if f.is_file():
-            _copy_file(f, output_dir)
+            new_file = _copy_file(f, output_dir)
+            if new_file:
+                files_to_upload.append(str(new_file))
 
 
 def _mount_device(device):
@@ -47,6 +69,7 @@ def _mount_device(device):
         time.sleep(1.0)
 
         # Synchronize the files
+        _synchronize(tmpdirname, args.destination)
 
         # Unmount the device
         mtp_process.terminate()
@@ -73,7 +96,18 @@ def monitor_devices():
             action(device)
 
 
+def _parse_arguments():
+    parser = argparse.ArgumentParser(description='Downloads UPF from the Panono.')
+    parser.add_argument('-e', '--email', dest="email", required=True, help='E-Mail used for loging in on panono.com')
+    parser.add_argument('-p', '--password', dest="password", required=True, help='Password used for loging in on panono.com')
+    parser.add_argument('destination', help='Storage directory')
+
+    return parser.parse_args()
+
+
 def main():
+    global args
+    args = _parse_arguments()
     monitor_devices()
 
 
