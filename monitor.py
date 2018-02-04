@@ -14,6 +14,7 @@ from upf_upload import login, upload_upf
 
 args = None
 
+MOUNT_POINT = "/tmp/mtp-mount"
 
 def _upload(files):
     with requests.Session() as session:
@@ -30,7 +31,7 @@ def _copy_file(f: pathlib.Path, output_path: pathlib.Path):
     # Build destination filename
     destination_dir = output_path.joinpath(
         str(file_timestamp.year),
-        file_timestamp.date.isoformat())
+        file_timestamp.date().isoformat())
     
     destination = destination_dir.joinpath(f.name)
 
@@ -61,8 +62,10 @@ def _synchronize(input_path: str, output_path: str):
 
 
 def _mount_device(device):
-    tmpdirname = tempfile.TemporaryDirectory()
-    print('created temporary directory', tmpdirname)
+    #tmpdir = tempfile.TemporaryDirectory()
+    #tmpdirname = tmpdir.name
+    #print('created temporary directory', tmpdirname)
+    tmpdirname = MOUNT_POINT
 
     # Mount the device
     mtp_process = sh.go_mtpfs(tmpdirname, _bg=True)
@@ -72,7 +75,7 @@ def _mount_device(device):
     _synchronize(tmpdirname, args.destination)
 
     # Unmount the device
-    mtp_process.terminate()
+    #mtp_process.terminate()
 
 
 def _umount_device(device):
