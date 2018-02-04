@@ -10,7 +10,7 @@ import requests
 import pyudev
 import sh
 
-from .upf_upload import login, upload_upf
+from upf_upload import login, upload_upf
 
 args = None
 
@@ -61,18 +61,18 @@ def _synchronize(input_path: str, output_path: str):
 
 
 def _mount_device(device):
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        print('created temporary directory', tmpdirname)
+    tmpdirname = tempfile.TemporaryDirectory()
+    print('created temporary directory', tmpdirname)
 
-        # Mount the device
-        mtp_process = sh.go_mtpfs(tmpdirname, _bg=True)
-        time.sleep(1.0)
+    # Mount the device
+    mtp_process = sh.go_mtpfs(tmpdirname, _bg=True)
+    time.sleep(1.0)
 
-        # Synchronize the files
-        _synchronize(tmpdirname, args.destination)
+    # Synchronize the files
+    _synchronize(tmpdirname, args.destination)
 
-        # Unmount the device
-        mtp_process.terminate()
+    # Unmount the device
+    mtp_process.terminate()
 
 
 def _umount_device(device):
