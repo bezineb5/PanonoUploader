@@ -1,30 +1,35 @@
 import argparse
 import datetime
+import logging
 import pathlib
 import shutil
 import tempfile
+import threading
 import time
 
 import requests
 
-import pyudev
 import sh
-
+import usb1
 from upf_upload import login, upload_upf
-
-args = None
 
 MOUNT_POINT = "/tmp/mtp-mount"
 
+log = logging.getLogger(__name__)
+args = None
+
+
 def _upload(files):
-    with requests.Session() as session:
-        login(session, args.email, args.password)
-        for filename in files:
-            upload_upf(session, filename)
+    if files:
+        with requests.Session() as session:
+            login(session, args.email, args.password)
+            for filename in files:
+                log.info("Uploading %s", filename)
+                upload_upf(session, filename)
 
 
 def _copy_file(f: pathlib.Path, output_path: pathlib.Path):
-    print("Processing: ", str(f))
+    log.info("Processing: %s", f)
     statResult = f.stat()
     file_timestamp = datetime.datetime.fromtimestamp(statResult.st_mtime)
 
@@ -36,7 +41,7 @@ def _copy_file(f: pathlib.Path, output_path: pathlib.Path):
     destination = destination_dir.joinpath(f.name)
 
     if destination.exists():
-        print("File already exists: ", destination)
+        log.info("File already exists: %s", destination)
         return None
 
     # Create directories if needed
@@ -60,22 +65,39 @@ def _synchronize(input_path: str, output_path: str):
             if new_file:
                 files_to_upload.append(str(new_file))
 
+    if files_to_upload:
+        thread = threading.Thread(target = _upload, args = (files_to_upload, ))
+        thread.start()
+
 
 def _mount_device(device):
+
+    product_name = device.getProduct()
+    if not product_name or not product_name.startswith("Panono"):
+        return
+    log.info("Panono detected: %s", product_name)
+
     #tmpdir = tempfile.TemporaryDirectory()
     #tmpdirname = tmpdir.name
     #print('created temporary directory', tmpdirname)
     tmpdirname = MOUNT_POINT
+    # Create mount directories if needed
+    tmpdir = pathlib.Path(tmpdirname)
+    tmpdir.mkdir(parents=True, exist_ok=True)
 
     # Mount the device
-    mtp_process = sh.go_mtpfs(tmpdirname, _bg=True)
+    mtp_process = sh.go_mtpfs("-android=false", tmpdirname, _bg=True)
+    log.info("Device mounted")
     time.sleep(1.0)
 
     # Synchronize the files
     _synchronize(tmpdirname, args.destination)
 
     # Unmount the device
-    #mtp_process.terminate()
+    time.sleep(1.0)
+    mtp_process.terminate()
+    sh.sudo("umount", tmpdirname)
+    log.info("Device unmounted")
 
 
 def _umount_device(device):
@@ -88,15 +110,34 @@ ACTION_HANDLERS = {
 }
 
 
+def hotplug_callback(context, device, event):
+    log.info("Device %s: %s" % (
+        {
+            usb1.HOTPLUG_EVENT_DEVICE_ARRIVED: 'arrived',
+            usb1.HOTPLUG_EVENT_DEVICE_LEFT: 'left',
+        }[event],
+        device,
+    ))
+    # Note: cannot call synchronous API in this function.
+
+    if event == usb1.HOTPLUG_EVENT_DEVICE_ARRIVED:
+        thread = threading.Thread(target = _mount_device, args = (device, ))
+        thread.start()
+
+
 def monitor_devices():
-    context = pyudev.Context()
-    monitor = pyudev.Monitor.from_netlink(context)
-    monitor.filter_by('usb')
-    for device in iter(monitor.poll, None):
-        print("{action}: {device}".format(action=device.action, device=device))
-        action = ACTION_HANDLERS.get(device.action)
-        if action:
-            action(device)
+    with usb1.USBContext() as context:
+        if not context.hasCapability(usb1.CAP_HAS_HOTPLUG):
+            log.error('Hotplug support is missing. Please update your libusb version.')
+            return
+        log.info('Registering hotplug callback...')
+        opaque = context.hotplugRegisterCallback(hotplug_callback)
+        log.info('Callback registered. Monitoring events, ^C to exit')
+        try:
+            while True:
+                context.handleEvents()
+        except (KeyboardInterrupt, SystemExit):
+            log.info('Exiting')
 
 
 def _parse_arguments():
@@ -108,9 +149,17 @@ def _parse_arguments():
     return parser.parse_args()
 
 
+def init_logging():
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+
+
 def main():
     global args
+    init_logging()
     args = _parse_arguments()
+    #_mount_device(None)
     monitor_devices()
 
 
