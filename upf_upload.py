@@ -1,15 +1,19 @@
 import argparse
 import glob
 import json
+import logging
 import random
 
 import requests
+
+log = logging.getLogger(__name__)
 
 HEADERS = {
     'Cache-Control': "no-cache",
     'Origin': "https://cloud.panono.com",
     'Content-Type': "application/json;charset=UTF-8",
 }
+
 
 def login(session: requests.Session, username: str, password: str):
     url = "https://api3-dev.panono.com/login"

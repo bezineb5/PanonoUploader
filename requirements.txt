@@ -1,5 +1,8 @@
+# requests is library to make the HTTP requests
 requests>=2.18.4
-panonoctl==0.6
-#pyudev>=0.21
-libusb1
+
+# libusb1 monitors USB devices
+libusb1>=1.6.4
+
+# sh simplifies shell commands 
 sh>=1.12.14

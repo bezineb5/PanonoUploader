@@ -71,15 +71,16 @@ def _synchronize(input_path: str, output_path: str):
 
 
 def _mount_device(device):
+    try:
+        product_name = device.getProduct()
+    except:
+        log.info("Unable to get product name of USB device, ignoring")
+        return
 
-    product_name = device.getProduct()
     if not product_name or not product_name.startswith("Panono"):
         return
     log.info("Panono detected: %s", product_name)
 
-    #tmpdir = tempfile.TemporaryDirectory()
-    #tmpdirname = tmpdir.name
-    #print('created temporary directory', tmpdirname)
     tmpdirname = MOUNT_POINT
     # Create mount directories if needed
     tmpdir = pathlib.Path(tmpdirname)
@@ -87,8 +88,8 @@ def _mount_device(device):
 
     # Mount the device
     mtp_process = sh.go_mtpfs("-android=false", tmpdirname, _bg=True)
-    log.info("Device mounted")
-    time.sleep(1.0)
+    log.info("Device mounted on: %s", tmpdirname)
+    time.sleep(1.5)
 
     # Synchronize the files
     _synchronize(tmpdirname, args.destination)
@@ -100,16 +101,6 @@ def _mount_device(device):
     finally:
         sh.sudo("umount", tmpdirname)
     log.info("Device unmounted")
-
-
-def _umount_device(device):
-    pass
-
-
-ACTION_HANDLERS = {
-    'add': _mount_device,
-    'remove': _umount_device,
-}
 
 
 def hotplug_callback(context, device, event):
@@ -151,7 +142,7 @@ def _parse_arguments():
     return parser.parse_args()
 
 
-def init_logging():
+def _init_logging():
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
@@ -159,9 +150,8 @@ def init_logging():
 
 def main():
     global args
-    init_logging()
+    _init_logging()
     args = _parse_arguments()
-    #_mount_device(None)
     monitor_devices()
 
 
