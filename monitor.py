@@ -95,8 +95,10 @@ def _mount_device(device):
 
     # Unmount the device
     time.sleep(1.0)
-    mtp_process.terminate()
-    sh.sudo("umount", tmpdirname)
+    try:
+        mtp_process.terminate()
+    finally:
+        sh.sudo("umount", tmpdirname)
     log.info("Device unmounted")
 
 
