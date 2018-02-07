@@ -6,3 +6,6 @@ libusb1>=1.6.4
 
 # sh simplifies shell commands 
 sh>=1.12.14
+
+# For the path monitoring
+watchdog
