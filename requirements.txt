@@ -8,4 +8,4 @@ libusb1>=1.6.4
 sh>=1.12.14
 
 # For the path monitoring
-watchdog
+watchdog>=0.8.3

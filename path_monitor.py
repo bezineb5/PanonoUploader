@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 import time
+from logging import handlers
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
@@ -68,14 +69,23 @@ def _parse_arguments():
     return parser.parse_args()
 
 
-def _init_logging():
+def _init_logging(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    log_file = os.path.join(directory, "panono_uploader.log")
+    handler = handlers.TimedRotatingFileHandler(log_file,
+                                                        when="d",
+                                                        interval=1,
+                                                        backupCount=10)
+
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-
+                        datefmt='%Y-%m-%d %H:%M:%S',
+                        handlers=[handler])
 
 def main():
-    _init_logging()
+    _init_logging("./logs")
     args = _parse_arguments()
     _monitor_path(args.monitored_path, args.destination, args.email, args.password)
 

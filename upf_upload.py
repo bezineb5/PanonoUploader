@@ -16,6 +16,8 @@ HEADERS = {
 
 
 def login(session: requests.Session, username: str, password: str):
+    log.info("Logging in: %s", username)
+
     url = "https://api3-dev.panono.com/login"
 
     parameters = {
@@ -27,7 +29,7 @@ def login(session: requests.Session, username: str, password: str):
     response = session.post(url, data=json.dumps(parameters), headers=HEADERS)
     response.raise_for_status()
     output = response.json()
-    print(output)
+    log.info(output)
 
     return output
 
@@ -38,6 +40,8 @@ def _generate_random_id() -> str:
 
 
 def _create_image(session: requests.Session) -> str:
+    log.info("Creating image")
+
     url = "https://api3-dev.panono.com/panorama/create"
     payload = {
         "type": "panorama",
@@ -49,38 +53,46 @@ def _create_image(session: requests.Session) -> str:
     response = session.post(url, data=json.dumps(payload), headers=HEADERS)
     response.raise_for_status()
     output = response.json()
-    print(output)
+    log.info(output)
 
     return output.get('id')
 
 
 def _create_upf(session: requests.Session, id: str) -> (str, str):
+    log.info("Creating UPF: %s", id)
+
     url = "https://api3-dev.panono.com/panorama/{id}/upf".format(id=id)
 
     response = session.post(url, headers=HEADERS)
     response.raise_for_status()
     output = response.json()
-    print(output)
+    log.info(output)
 
     return output.get('upload_url'), output.get('callback_url')
 
 
 def _upload_image(upload_url: str, filename: str):
+    log.info("Uploading image: %s", filename)
+
     headers = {
         "Content-type": "application/x-unstitched-panorama-format",
         "Origin": "https://cloud.panono.com",
     }
 
     with open(filename, 'rb') as large_file:
-        requests.put(upload_url, data=large_file, headers=headers)
+        response = requests.put(upload_url, data=large_file, headers=headers)
+        response.raise_for_status()
+        log.info(response.text)
 
 
 def _callback_after_upload(session: requests.Session, callback_url: str):
+    log.info("Callback call")
+
     url = "https://api3-dev.panono.com" + callback_url
     response = session.post(url, headers=HEADERS)
     response.raise_for_status()
     output = response.json()
-    print(output)
+    log.info(output)
 
 
 def upload_upf(session: requests.Session, filename: str):
