@@ -13,6 +13,7 @@ from sync import synchronize
 log = logging.getLogger(__name__)
 
 MOUNT_PREFIX = "Panono"
+DEFAULT_LOG_DIRECTORY = "./logs"
 
 
 class MTPMountWatcher(FileSystemEventHandler):
@@ -63,6 +64,7 @@ def _parse_arguments():
     parser = argparse.ArgumentParser(description='Downloads UPF from the Panono.')
     parser.add_argument('-e', '--email', dest="email", required=True, help='E-Mail used for loging in on panono.com')
     parser.add_argument('-p', '--password', dest="password", required=True, help='Password used for loging in on panono.com')
+    parser.add_argument('-l', '--logs', dest="logs_path", required=False, help='Path to store the logs', default=DEFAULT_LOG_DIRECTORY)
     parser.add_argument('monitored_path', help='Directory to monitor')
     parser.add_argument('destination', help='Storage directory')
 
@@ -85,8 +87,8 @@ def _init_logging(directory):
                         handlers=[handler])
 
 def main():
-    _init_logging("./logs")
     args = _parse_arguments()
+    _init_logging(args.logs_path)
     _monitor_path(args.monitored_path, args.destination, args.email, args.password)
 
 
