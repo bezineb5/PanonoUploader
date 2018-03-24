@@ -3,10 +3,13 @@ import glob
 import json
 import logging
 import random
+from typing import Dict
 
 import requests
 
 log = logging.getLogger(__name__)
+
+ROOT_URL = "https://api3-dev.panono.com"
 
 HEADERS = {
     'Cache-Control': "no-cache",
@@ -18,7 +21,7 @@ HEADERS = {
 def login(session: requests.Session, username: str, password: str):
     log.info("Logging in: %s", username)
 
-    url = "https://api3-dev.panono.com/login"
+    url = ROOT_URL + "/login"
 
     parameters = {
         "email": username,
@@ -42,7 +45,7 @@ def _generate_random_id() -> str:
 def _create_image(session: requests.Session) -> str:
     log.info("Creating image")
 
-    url = "https://api3-dev.panono.com/panorama/create"
+    url = ROOT_URL + "/panorama/create"
     payload = {
         "type": "panorama",
         "data": {
@@ -61,7 +64,7 @@ def _create_image(session: requests.Session) -> str:
 def _create_upf(session: requests.Session, id: str) -> (str, str):
     log.info("Creating UPF: %s", id)
 
-    url = "https://api3-dev.panono.com/panorama/{id}/upf".format(id=id)
+    url = "{root}/panorama/{id}/upf".format(root=ROOT_URL, id=id)
 
     response = session.post(url, headers=HEADERS)
     response.raise_for_status()
@@ -88,7 +91,7 @@ def _upload_image(upload_url: str, filename: str):
 def _callback_after_upload(session: requests.Session, callback_url: str):
     log.info("Callback call")
 
-    url = "https://api3-dev.panono.com" + callback_url
+    url = ROOT_URL + callback_url
     response = session.post(url, headers=HEADERS)
     response.raise_for_status()
     output = response.json()
@@ -100,6 +103,60 @@ def upload_upf(session: requests.Session, filename: str):
     upload_url, callback_url = _create_upf(session, image_id)
     _upload_image(upload_url, filename)
     _callback_after_upload(session, callback_url)
+
+
+def list_tasks(session: requests.Session) -> Dict:
+    log.info("Listing tasks")
+
+    url = "{root}/tasks".format(root=ROOT_URL)
+
+    response = session.get(url, headers=HEADERS)
+    response.raise_for_status()
+    output = response.json()
+    log.info(output)
+
+    return output
+
+def list_panoramas(session: requests.Session, username: str, page_size: int=50) -> Dict:
+    url = "{root}/u/{username}/panoramas".format(root=ROOT_URL, username=username)
+
+    query_parameters = {
+        "pageSize": page_size,
+    }
+
+    response = session.get(url, headers=HEADERS, params=query_parameters)
+    response.raise_for_status()
+    output = response.json()
+    log.info(output)
+
+    return output
+
+
+def list_all_panoramas(session: requests.Session, username: str):
+    log.info("Listing all panoramas")
+
+    page = list_panoramas(session, username)
+
+    while page:
+        items = page.get("items")
+        next_page = page.get("next")
+        page = None
+
+        if items:
+            for item in items:
+                yield item
+        
+        if next_page:
+            page = call_self_url(session, next_page)
+
+
+def call_self_url(session: requests.Session, self_url: str) -> Dict:
+    if not session or not self_url:
+        return None
+
+    response = session.get(self_url, headers=HEADERS)
+    response.raise_for_status()
+    return response.json()
 
 
 def _parse_arguments():

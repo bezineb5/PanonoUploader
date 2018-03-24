@@ -17,10 +17,11 @@ DEFAULT_LOG_DIRECTORY = "./logs"
 
 
 class MTPMountWatcher(FileSystemEventHandler):
-    def __init__(self, destination_path: str, email: str, password: str):
+    def __init__(self, destination_path: str, email: str, password: str, jpeg_storage_path: str):
         self.destination_path = destination_path
         self.email = email
         self.password = password
+        self.jpeg_storage_path = jpeg_storage_path
 
     def on_created(self, event):
         """Called when a file or directory is created.
@@ -40,11 +41,17 @@ class MTPMountWatcher(FileSystemEventHandler):
 
         log.info("Detected device, starting synchronisation: %s", src_path)
 
-        synchronize(src_path, self.destination_path, self.email, self.password)
+        synchronize(src_path, self.destination_path, self.email, self.password, 
+                    self.jpeg_storage_path,
+                    processing_callback=_notify_once_finished)
 
 
-def _monitor_path(monitored_path: str, destination_path: str, email: str, password: str):
-    event_handler = MTPMountWatcher(destination_path, email, password)
+def _notify_once_finished():
+    pass
+
+
+def _monitor_path(monitored_path: str, destination_path: str, email: str, password: str, jpeg_storage_path: str):
+    event_handler = MTPMountWatcher(destination_path, email, password, jpeg_storage_path)
 
     observer = Observer()
     observer.schedule(event_handler, monitored_path, recursive=False)
@@ -65,6 +72,7 @@ def _parse_arguments():
     parser.add_argument('-e', '--email', dest="email", required=True, help='E-Mail used for loging in on panono.com')
     parser.add_argument('-p', '--password', dest="password", required=True, help='Password used for loging in on panono.com')
     parser.add_argument('-l', '--logs', dest="logs_path", required=False, help='Path to store the logs', default=DEFAULT_LOG_DIRECTORY)
+    parser.add_argument('-j', '--jpg', dest="jpeg_storage_path", required=False, help='Path to store the equirectangular jpegs', default=None)
     parser.add_argument('monitored_path', help='Directory to monitor')
     parser.add_argument('destination', help='Storage directory')
 
@@ -89,8 +97,7 @@ def _init_logging(directory):
 def main():
     args = _parse_arguments()
     _init_logging(args.logs_path)
-    _monitor_path(args.monitored_path, args.destination, args.email, args.password)
-
+    _monitor_path(args.monitored_path, args.destination, args.email, args.password, args.jpeg_storage_path)
 
 if __name__ == '__main__':
     main()
