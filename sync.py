@@ -103,19 +103,23 @@ def download_new_panoramas(local_path: str, email: str, password: str):
             filename = base_path.joinpath("{date}/{id}.jpg".format(id=id, date=created_at.date().isoformat()))
             if filename.exists():
                 continue
-            
+
             # Get the details of the panorama
             self_url = item.get("self")
-            if not self_url:
-                continue
+            if self_url:
+                # Get the list of images from the self URL (may be deprectated)
+                log.info("Step 1 %s", filename)
+                image_details = api.call_self_url(session, self_url)
+                if not image_details:
+                    continue
+            else:
+                image_details = item
 
-            # Select the largest equirectangular image
-            image_details = api.call_self_url(session, self_url)
-            if not image_details:
-                continue
             data = image_details.get("data")
             if not data:
                 continue
+
+            # Select the largest equirectangular image
             images_sources = data.get("images")
             if not images_sources:
                 continue
